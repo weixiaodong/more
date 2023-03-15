@@ -5,9 +5,14 @@ Copyright © 2023 weixiaodong
 package cmd
 
 import (
-	"fmt"
+	"log"
+	"net"
 
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+
+	"github.com/weixiaodong/more/protos/pb"
+	"github.com/weixiaodong/more/service"
 )
 
 // serveCmd represents the serve command
@@ -21,7 +26,9 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("serve called")
+
+		address, _ := cmd.Flags().GetString("address")
+		startGrpcServer(address)
 	},
 }
 
@@ -36,5 +43,20 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// serveCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	serveCmd.Flags().String("address", ":8080", "server address")
+}
+
+func startGrpcServer(address string) {
+	lis, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer()
+	pb.RegisterGreeterServer(s, &service.HelloService{})
+
+	log.Println("启动服务", address)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
 }
