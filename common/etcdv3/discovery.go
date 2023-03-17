@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc/resolver"
 )
 
 // ServiceDiscovery 服务发现
 type ServiceDiscovery struct {
 	cli        *clientv3.Client
-	serverList map[string]string // 服务列表
 	lock       sync.Mutex
+	cc         resolver.ClientConn
+	serverList map[string]resolver.Address //服务列表
 }
 
 // NewServiceDiscovery 发现服务
@@ -26,35 +28,40 @@ func NewServiceDiscovery(endpoint []string) *ServiceDiscovery {
 		log.Fatal(err)
 	}
 	return &ServiceDiscovery{
-		cli:        cli,
-		serverList: make(map[string]string),
+		cli: cli,
 	}
 }
 
-// WatchService 初始化服务列表与监视
-func (s *ServiceDiscovery) WatchService(prefix string) error {
-	// 根据前缀获取现有的key
+//Build 为给定目标创建一个新的`resolver`，当调用`grpc.Dial()`时执行
+func (s *ServiceDiscovery) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
+	s.cc = cc
+	s.serverList = make(map[string]resolver.Address)
+	prefix := target.Endpoint
+	log.Println("Build ", prefix)
+	//根据前缀获取现有的key
 	resp, err := s.cli.Get(context.Background(), prefix, clientv3.WithPrefix())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, ev := range resp.Kvs {
-		s.SetServerList(string(ev.Key), string(ev.Value))
+		s.SetServiceList(string(ev.Key), string(ev.Value))
 	}
 
-	// 监听后续操作
+	s.cc.NewAddress(s.getServices())
+	//监视前缀，修改变更的server
 	go s.watcher(prefix)
-
-	return nil
+	return s, nil
 }
 
-// SetServerList 新增服务地址
-func (s *ServiceDiscovery) SetServerList(key, val string) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.serverList[key] = val
-	log.Println("put key: ", key, "val: ", val)
+// ResolveNow 监视目标更新
+func (s *ServiceDiscovery) ResolveNow(rn resolver.ResolveNowOptions) {
+	log.Println("ResolveNow")
+}
+
+//Scheme return schema
+func (s *ServiceDiscovery) Scheme() string {
+	return "etcd"
 }
 
 // 监听前缀
@@ -66,28 +73,36 @@ func (s *ServiceDiscovery) watcher(prefix string) {
 			switch ev.Type {
 			case clientv3.EventTypePut:
 				// 修改或新增
-				s.SetServerList(string(ev.Kv.Key), string(ev.Kv.Value))
+				s.SetServiceList(string(ev.Kv.Key), string(ev.Kv.Value))
 			case clientv3.EventTypeDelete:
 				// 删除
-				s.DelServerList(string(ev.Kv.Key))
+				s.DelServiceList(string(ev.Kv.Key))
 			}
 		}
 	}
 }
 
-// DelServerList 删除服务地址
-func (s *ServiceDiscovery) DelServerList(key string) {
+// SetServiceList 新增服务地址
+func (s *ServiceDiscovery) SetServiceList(key, val string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.serverList[key] = resolver.Address{Addr: val}
+	s.cc.NewAddress(s.getServices())
+	log.Println("put key: ", key, "val: ", val)
+}
+
+// DelServiceList 删除服务地址
+func (s *ServiceDiscovery) DelServiceList(key string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	delete(s.serverList, key)
+	s.cc.NewAddress(s.getServices())
 	log.Println("delete key: ", key)
 }
 
-// GetServices 获取服务地址
-func (s *ServiceDiscovery) GetServices() []string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	addrs := make([]string, 0)
+//getServices 获取服务地址, 无锁，给Set/Del内部调用
+func (s *ServiceDiscovery) getServices() []resolver.Address {
+	addrs := make([]resolver.Address, 0, len(s.serverList))
 	for _, v := range s.serverList {
 		addrs = append(addrs, v)
 	}

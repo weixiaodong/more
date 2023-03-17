@@ -6,8 +6,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"time"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -30,17 +30,34 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// host, _ := cmd.Flags().GetString("host")
 
-		ser := etcdv3.NewServiceDiscovery(config.GetDiscoveryEndpoints())
-		defer ser.Close()
-		ser.WatchService(config.GetDiscoveryServiceNamePrefix())
-		for {
-			select {
-			case <-time.Tick(10 * time.Second):
-				log.Println(ser.GetServices())
+		r := etcdv3.NewServiceDiscovery(config.GetDiscoveryEndpoints())
+		defer r.Close()
 
-			}
+		conn, err := grpc.Dial(
+			fmt.Sprintf("etcd:///%s", config.GetDiscoveryServiceNamePrefix()),
+			grpc.WithDefaultServiceConfig(`{"LoadBalancingPolicy": "round_robin"}`),
+			grpc.WithResolvers(r),
+			// grpc.WithDefaultServiceConfig(`{"LoadBalancingPolicy": "round_robin"}`),
+			grpc.WithInsecure())
+		if err != nil {
+			log.Fatalf("did not connect: %v", err)
 		}
+		defer conn.Close()
+
+		c := pb.NewGreeterClient(conn)
+		// Contact the server and print out its response.
+		for i := 0; i < 10; i++ {
+			reply, err := c.SayHello(context.Background(), &pb.HelloRequest{Name: "www"})
+			// log.Print(reply)
+			if err != nil {
+				log.Fatalf("could not greet: %v", err)
+			}
+			log.Printf("Greeting: %s", reply.Message)
+
+		}
+
 		// callSayHello(host)
+
 	},
 }
 
