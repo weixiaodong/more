@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	"github.com/weixiaodong/more/common/config"
+	"github.com/weixiaodong/more/common/etcdv3"
 	"github.com/weixiaodong/more/protos/pb"
 	"github.com/weixiaodong/more/service"
 )
@@ -27,7 +29,7 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		address, _ := cmd.Flags().GetString("address")
+		address := config.GeGrpcServiceAddr()
 		startGrpcServer(address)
 	},
 }
@@ -43,7 +45,7 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	serveCmd.Flags().String("address", ":8080", "server address")
+	// serveCmd.Flags().String("address", ":8080", "server address")
 }
 
 func startGrpcServer(address string) {
@@ -55,8 +57,22 @@ func startGrpcServer(address string) {
 	s := grpc.NewServer()
 	pb.RegisterGreeterServer(s, &service.HelloService{})
 
+	//把服务注册到etcd
+	ser, err := etcdv3.NewServiceRegister(
+		config.GetDiscoveryEndpoints(),
+		config.GetDiscoveryServiceNamePrefix(),
+		address,
+		config.GetDiscoveryTimeout(),
+	)
+	if err != nil {
+		log.Fatalf("register service err: %v", err)
+	}
+	defer ser.Close()
+	go ser.ListenLeaseRespChan()
+
 	log.Println("启动服务", address)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+
 }

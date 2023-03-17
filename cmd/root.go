@@ -66,8 +66,9 @@ func initConfig() {
 
 		// Search config in home directory with name ".more" (without extension).
 		viper.AddConfigPath(home)
+		viper.AddConfigPath("./etc/")
+		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".more")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -75,5 +76,7 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	} else {
+		fmt.Println(err)
 	}
 }

@@ -7,10 +7,13 @@ package cmd
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	"github.com/weixiaodong/more/common/config"
+	"github.com/weixiaodong/more/common/etcdv3"
 	"github.com/weixiaodong/more/protos/pb"
 )
 
@@ -25,8 +28,19 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		host, _ := cmd.Flags().GetString("host")
-		callSayHello(host)
+		// host, _ := cmd.Flags().GetString("host")
+
+		ser := etcdv3.NewServiceDiscovery(config.GetDiscoveryEndpoints())
+		defer ser.Close()
+		ser.WatchService(config.GetDiscoveryServiceNamePrefix())
+		for {
+			select {
+			case <-time.Tick(10 * time.Second):
+				log.Println(ser.GetServices())
+
+			}
+		}
+		// callSayHello(host)
 	},
 }
 
@@ -37,7 +51,7 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	clientCmd.Flags().String("host", ":8080", "server host")
+	// clientCmd.Flags().String("host", ":8080", "server host")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
@@ -59,4 +73,14 @@ func callSayHello(host string) {
 		log.Fatalf("could not greet: %v", err)
 	}
 	log.Printf("Greeting: %s", r.Message)
+
+	{
+		r, err := c.SayHello(context.Background(), &pb.HelloRequest{Name: "www"})
+		// log.Print(r)
+		if err != nil {
+			log.Fatalf("could not greet: %v", err)
+		}
+		log.Printf("Greeting: %s", r.Message)
+
+	}
 }

@@ -1,0 +1,12 @@
+global:
+  env: dev
+
+grpcServer:
+  addr: 127.0.0.1:8080
+
+# etcd 服务注册配置
+discovery:
+  endpoints: ["124.223.53.252:2379"]
+  serviceNamePrefix: /grpcServer
+  timeout: 5
+
