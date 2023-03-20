@@ -13,6 +13,9 @@ import (
 
 	"github.com/weixiaodong/more/common/config"
 	"github.com/weixiaodong/more/common/etcdv3"
+	"github.com/weixiaodong/more/middleware"
+	"github.com/weixiaodong/more/middleware/ratelimit"
+	"github.com/weixiaodong/more/middleware/recovery"
 	"github.com/weixiaodong/more/protos/pb"
 	"github.com/weixiaodong/more/service"
 )
@@ -54,7 +57,24 @@ func startGrpcServer(address string) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		// grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+		// 	grpc_ctxtags.StreamServerInterceptor(),
+		// 	grpc_opentracing.StreamServerInterceptor(),
+		// 	grpc_prometheus.StreamServerInterceptor,
+		// 	grpc_zap.StreamServerInterceptor(zapLogger),
+		// 	grpc_auth.StreamServerInterceptor(myAuthFunction),
+		// 	grpc_recovery.StreamServerInterceptor(),
+		// )),
+		grpc.UnaryInterceptor(middleware.ChainUnaryServer(
+			// grpc_ctxtags.UnaryServerInterceptor(),
+			// grpc_opentracing.UnaryServerInterceptor(),
+			// grpc_prometheus.UnaryServerInterceptor,
+			// grpc_zap.UnaryServerInterceptor(zapLogger),
+			// grpc_auth.UnaryServerInterceptor(myAuthFunction),
+			recovery.UnaryServerInterceptor(),
+			ratelimit.UnaryServerInterceptor(),
+		)))
 	pb.RegisterGreeterServer(s, &service.HelloService{})
 
 	//把服务注册到etcd

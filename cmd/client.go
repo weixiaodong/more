@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -50,6 +52,11 @@ to quickly create a Cobra application.`,
 			reply, err := c.SayHello(context.Background(), &pb.HelloRequest{Name: "www"})
 			// log.Print(reply)
 			if err != nil {
+				if strings.Contains(err.Error(), "ResourceExhausted") {
+					log.Printf("could not greet: %v", err)
+					time.Sleep(1 * time.Second)
+					continue
+				}
 				log.Fatalf("could not greet: %v", err)
 			}
 			log.Printf("Greeting: %s", reply.Message)

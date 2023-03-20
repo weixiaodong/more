@@ -8,5 +8,15 @@ grpcServer:
 discovery:
   endpoints: ["124.223.53.252:2379"]
   serviceNamePrefix: /grpcServer
-  timeout: 5
+  timeout: 60
 
+redis:
+  addr: "127.0.0.1:6379"
+  pwd: ""
+  db: 0
+  poolSize: 1000
+  minIdleConns: 100
+  maxRetries: 1
+  dialTimeout: 0.5
+  readTimeout: 0.25
+  writeTimeout: 0.25
