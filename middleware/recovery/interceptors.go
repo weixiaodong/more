@@ -6,6 +6,7 @@ package recovery
 import (
 	"context"
 	"fmt"
+	"runtime"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -27,6 +28,10 @@ func UnaryServerInterceptor(opts ...Option) grpc.UnaryServerInterceptor {
 		fmt.Println("recover start")
 		defer func() {
 			if r := recover(); r != nil || panicked {
+				fmt.Println("recover start")
+				buf := make([]byte, 1<<16)
+				runtime.Stack(buf, true)
+				fmt.Printf("%s", buf)
 				err = recoverFrom(ctx, r, o.recoveryHandlerFunc)
 			}
 		}()

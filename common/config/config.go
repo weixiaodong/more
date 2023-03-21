@@ -28,3 +28,7 @@ func GetDiscoveryTimeout() int64 {
 func GeGrpcServiceAddr() string {
 	return viper.GetString("grpcServer.addr")
 }
+
+func GetRabbitMQURL() string {
+	return viper.GetString("rabitmq.url")
+}

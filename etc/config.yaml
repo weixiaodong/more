@@ -20,3 +20,6 @@ redis:
   dialTimeout: 0.5
   readTimeout: 0.25
   writeTimeout: 0.25
+
+rabitmq:
+  url: "amqp://test:123456@124.223.53.252:5672//test"
